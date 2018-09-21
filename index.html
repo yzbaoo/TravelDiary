@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+	<style type="text/css">
+	body, html,#allmap {width: 100%;height: 100%;overflow: hidden;margin:0;font-family:"微软雅黑";}
+	</style>
+	<script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=1l6ceh615CO0yqYxq4BpyvGpxGGBU2Po"></script>
+	<title>地图展示</title>
+</head>
+<body>
+	<div id="allmap"></div>
+</body>
+</html>
+<script type="text/javascript">
+    /*
+    红色：去过
+    绿色：计划去
+    功能点1：右键map添加计划
+    功能点2：右键未完成计划可更改完成状态和删除计划
+    功能点3：已去过的省份不可再次添加计划
+    功能点4：鼠标hover显示时间和备注
+    思路：
+        1.mockdata：
+            var dataSource = [
+                {
+                    province:"黑龙江省",
+                    point:{lng: 129.466081, lat: 44.625683},
+                    desc:"my hometown",
+                    time:"2018-7-5",
+                    type:0,//0:去过,1:计划去
+                },{
+                    province:"辽宁省",
+                    point:{lng: 124.535605, lat: 41.979285},
+                    desc:"2015年4月",
+                    time:"2018-7-5",
+                    type:0,//0:去过,1:计划去
+                },{
+                    province:"北京市",
+                    point:{lng: 116.146438, lat: 39.77318},
+                    desc:"Dream start！",
+                    time:"2018-7-5",
+                    type:0,//0:去过,1:计划去
+                },{
+                    province:"四川省",
+                    point:{lng: 107.131762, lat: 30.083521},
+                    desc:"计划今年十一去嗨！！",
+                    time:"2018-7-5",
+                    type:1,//0:去过,1:计划去
+                }
+            ]; 
+        2.编写renderMark方法,实现data驱动ui变化    
+    */
+
+
+	// 百度地图API功能
+	var map = new BMap.Map("allmap");    // 创建Map实例
+	map.centerAndZoom(new BMap.Point(116.404, 39.915), 6);  // 初始化地图,设置中心点坐标和地图级别
+	map.enableScrollWheelZoom(true);     //开启鼠标滚轮缩放
+    var dataSource = [
+        {
+            province:"黑龙江省",
+            point:{lng: 129.466081, lat: 44.625683},
+            desc:"my hometown",
+            time:"2018-7-5",
+            type:0,//0:去过,1:计划去
+        },{
+            province:"辽宁省",
+            point:{lng: 124.535605, lat: 41.979285},
+            desc:"2015年4月",
+            time:"2018-7-5",
+            type:0,//0:去过,1:计划去
+        },{
+            province:"北京市",
+            point:{lng: 116.146438, lat: 39.77318},
+            desc:"Dream start！",
+            time:"2018-7-5",
+            type:0,//0:去过,1:计划去
+        },{
+            province:"四川省",
+            point:{lng: 107.131762, lat: 30.083521},
+            desc:"计划今年十一去嗨！！",
+            time:"2018-7-5",
+            type:1,//0:去过,1:计划去
+        }
+    ];    
+    //拼接infowindow内容字串
+    function renderModal(point,province){
+        var html = [];
+        html.push('<span style="font-size:14px;color:#08529D" id="title">'+province+': </span><br/>');
+        html.push('<table border="0" cellpadding="1" cellspacing="1" >');
+        html.push('  <tr>');
+        html.push('      <td  align="left" class="common">时 间：</td>');
+        html.push('      <td  colspan="2"><input type="text" placeholder="0000-00-00" maxlength="50" size="18"  id="txtTime"></td>');
+        html.push('	     <td valign="top"><span class="star">*</span></td>');
+        html.push('  </tr>');
+        html.push('  <tr>');
+        html.push('      <td align="left" class="common">备 注：</td>');
+        html.push('      <td colspan="2"><textarea rows="2" cols="15"  id="areaDesc"></textarea></td>');
+        html.push('	     <td valign="top"></td>');
+        html.push('  </tr>');
+        html.push('  <tr>');
+        html.push('	     <td  align="center" colspan="3">');
+        html.push('          <input type="button" name="btnOK"  onclick="fnOK('+JSON.stringify(point).replace(/\"/g,"'")+','+JSON.stringify(province).replace(/\"/g,"'")+')" value="确定">&nbsp;&nbsp;');
+        html.push('		     <input type="button" name="btnClear" onclick="fnClear();" value="重填">');
+        html.push('	     </td>');
+        html.push('  </tr>');
+        html.push('</table>');	
+
+        return new BMap.InfoWindow(html.join(""), {offset: new BMap.Size(0, -10)});
+    }
+    
+    
+
+    map.addEventListener("rightclick", function(e){
+        var menu = new BMap.ContextMenu();
+        var txtMenuItem = {
+                text:'添加计划',
+                callback:function(e){f1(e)}
+            };
+        menu.addItem(new BMap.MenuItem(txtMenuItem.text,txtMenuItem.callback.bind(this,e),100));
+        
+        map.addContextMenu(menu);
+    })
+    var infoWin = null;
+    //功能1：右键添加计划
+    function f1(e){
+        var myGeo = new BMap.Geocoder();
+        var point = e.point;
+        myGeo.getLocation(point,function(res){
+            var province = res.addressComponents.province;
+            var province_arr = [];
+            dataSource.forEach(d=>{
+                province_arr.push(d.province)
+            })
+            if(province_arr.indexOf(province)===-1){//没去过
+                infoWin = renderModal(point,province);
+                map.openInfoWindow(infoWin,point);   //弹出可编辑弹窗
+            }else{
+                alert("去过了，换一个")
+            }
+        });
+    }
+    
+    function fnOK(point,province){
+        var desc = document.getElementById("areaDesc").value;
+        var time = document.getElementById("txtTime").value;
+        if(!(/\d{4}-\d{2}-\d{2}/).test(time)){ 
+            alert('注意时间格式')
+            return
+        };
+        var title = "计划："+desc;
+        var obj = {};
+        obj.province = province;
+        obj.point = point;
+        obj.desc = desc;
+        obj.time = time;
+        obj.type = 1;
+        dataSource.push(obj);
+        renderMark()
+        if(infoWin.isOpen()){
+            map.closeInfoWindow();
+        }
+    }
+    //渲染函数    
+    function renderMark(){
+        map.clearOverlays();
+        dataSource.forEach((d,i)=>{
+            //渲染mark
+            var marker = new BMap.Marker(d.point,{
+                icon: new BMap.Symbol(BMap_Symbol_SHAPE_STAR, {
+                    scale: 2,
+                    fillColor: d.type===0 ? "red" : "#51C332",
+                    fillOpacity: 0.8,
+                    strokeColor:"#fff",
+                })
+            }); 
+            map.addOverlay(marker);             
+            marker.setAnimation(d.type===0 ? BMAP_ANIMATION_DROP : BMAP_ANIMATION_BOUNCE); //动画
+            //渲染title
+            var title = "时 间: " + d.time + "\n\r" + "描 述: " + d.desc;
+            marker.setTitle(d.type===0 ? "已占领"+ "\n\r" +title:"计划"+ "\n\r" +title);
+            //为type=1的mark绑定右键编辑事件
+            if(d.type===1){
+                var menu = new BMap.ContextMenu();
+                var txtMenuItem = [
+                    {
+                        text:'标记完成',
+                        callback:function(i){
+                            dataSource[i].type=0;
+                            renderMark()
+                        }
+                    },{
+                        text:'删除计划',
+                        callback:function(i){
+                            dataSource.splice(i,1);
+                            renderMark()
+                        }
+                    }
+
+                ];
+                txtMenuItem.forEach(d2=>{
+                    menu.addItem(new BMap.MenuItem(d2.text,d2.callback.bind(this,i),100));
+                })
+                marker.addContextMenu(menu);
+            }
+        })
+    }
+    renderMark()
+</script>
